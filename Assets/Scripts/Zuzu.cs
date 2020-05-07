@@ -5,15 +5,24 @@ using UnityEngine;
 public class Zuzu : MonoBehaviour
 {
     //flock movement parameters
-    float weightTowardCenter = 1f;
+    float weightTowardCenter = 0.1f;
     float weightAvoidNeighbors = 1f;
-    float weightToTarget = 0.1f;
-    float distToNeighbors = 2f;
-    float forceMultiplier = 0.5f; 
+    float weightToTarget = 2f;
+    
+    float distToNeighbors = 1f;
+    float distToCenter = 2.5f;
+
+    float forceMultiplier = 0.90f;
+    float moveThreshold = 0.5f;
+
+    float randomMoveStrength = 2;
+    float randomMoveMaxInterval = 10;
+
+    float maxForce = 12f; 
 
     //jump Parameters; 
-    float jumpInterval = 10;
-    float jumpSpeed = 1f;
+    float jumpInterval = 20;
+    float jumpSpeed = 0.5f;
     float jumpDecel = 0.0075f; 
 
     //constants;
@@ -26,15 +35,20 @@ public class Zuzu : MonoBehaviour
     //pre build
     float yOffset = 0f;
     int framesToJump;
-    bool jumping = false; 
+    bool jumping = false;
+    bool randMoveActive = false;
     float jumpVelocity = 0f;
     Vector3 offset;
     Rigidbody2D rb;
     Vector2 movementVector;
     public GameObject flock;
     FlockManager flockManager;
-    Vector2 force; 
-
+    Vector2 force;
+    Vector2 flockTarget = Vector2.zero;
+    int framesToNextRandMove;
+    bool moveToOldTarget = false;
+    Vector2 oldTarget;
+    Vector2 randomMoveVec = Vector2.zero;
     // Start is called before the first frame update
     void Start()
     {
@@ -45,9 +59,8 @@ public class Zuzu : MonoBehaviour
         // get the sprite render object of child 
         renderObject = this.transform.Find("render");
 
-
         framesToJump = NextJump();
-        
+        framesToNextRandMove = NextRandMove(); 
     }
 
     // Update is called once per frame
@@ -58,7 +71,8 @@ public class Zuzu : MonoBehaviour
 
         //get movement vector 
         movementVector = GetMovementVector();
-
+        randomMoveVec = GetRandomMovement();
+        movementVector += randomMoveVec;
         //update the sprite position 
         renderObject.position = this.transform.position + offset;
     }
@@ -76,6 +90,12 @@ public class Zuzu : MonoBehaviour
         return framesToJump; 
     }
 
+    int NextRandMove()
+    {
+        float timeToMove = Random.Range(0, randomMoveMaxInterval);
+        int framesToMove = (int)Mathf.Ceil(timeToMove / Time.deltaTime);
+        return framesToMove;
+    }
     void JumpUpdate()
     {
         if (framesToJump > 0)
@@ -116,8 +136,37 @@ public class Zuzu : MonoBehaviour
     {
         //move to the center of the flock 
         Vector2 flockCenter = flockManager.FlockCenter();
-        Vector2 flockCenterDirection = flockCenter - (Vector2) this.transform.position;
-        Vector2 flockTarget = flockManager.FlockTarget();
+        Vector2 flockCenterDirection = Vector2.zero;
+        if (Vector2.Distance(this.transform.position, flockCenter) > distToCenter)
+        {
+            flockCenterDirection = flockCenter - (Vector2)this.transform.position;
+        }
+        
+        Vector2 flockTarget = Vector2.zero;
+        
+        // get the move to target vector
+        if (Input.GetMouseButton(0))
+        {
+            moveToOldTarget = false;
+            flockTarget = (flockManager.FlockTarget() - (Vector2)this.transform.position).normalized;
+            
+            if (flockTarget.magnitude < moveThreshold )
+            {
+                flockTarget = Vector2.zero;
+            }
+        }
+        else if (Input.GetMouseButtonUp(0))
+        {
+            moveToOldTarget = true;
+            oldTarget = flockManager.FlockCenter();
+        }
+
+        if (moveToOldTarget && (Vector2.Distance(this.transform.position, oldTarget) > distToCenter))
+        {
+            flockTarget = (oldTarget - (Vector2)this.transform.position).normalized;
+        }
+        
+        flockTarget *= forceMultiplier;
 
         GameObject[] listZuzus = flockManager.Zuzus();
         
@@ -135,13 +184,22 @@ public class Zuzu : MonoBehaviour
                 }
             }
         }
-        Debug.Log(numNeighbors);
+
         if (numNeighbors > 0)
-            sumVecToNeighbor /= -numNeighbors; ;
+            sumVecToNeighbor /= -numNeighbors; 
 
+        // add some random movement 
 
+        //add all forces together to the movement vector 
         force += (weightTowardCenter * flockCenterDirection + weightToTarget* flockTarget) + weightAvoidNeighbors* (Vector2)sumVecToNeighbor;
-        force *= forceMultiplier;
+        //force *= 0.95f; 
+        float forceMagnitude = force.magnitude; 
+        if (forceMagnitude > maxForce)
+        {
+            force /= forceMagnitude;
+            force *= maxForce;
+        }
+        //force *= forceMultiplier;
         Vector2 move = force;
 
         Debug.DrawRay(this.transform.position, flockCenterDirection, Color.red);
@@ -150,5 +208,34 @@ public class Zuzu : MonoBehaviour
         Debug.DrawRay(this.transform.position, move, Color.white);
 
         return move;
+    }
+
+    Vector2 GetRandomMovement()
+    {   
+
+        if (framesToNextRandMove > 0)
+            framesToJump--;
+
+        if ((framesToNextRandMove == 0) && !randMoveActive)
+        {
+            // add jump velocity and start new jump; 
+            randMoveActive = true;
+            float randX = Random.Range(0f, randomMoveStrength);
+            float randY = Random.Range(0f, randomMoveStrength);
+            randomMoveVec = new Vector2(randX, randY);
+            framesToNextRandMove = -1;
+
+        }
+
+        //reset y_offset and jumpVelocity 
+        if ((randomMoveVec.magnitude < 0.1) && randMoveActive)
+        {
+            randomMoveVec = Vector2.zero;
+            randMoveActive = false;
+            //get a new jump 
+            framesToNextRandMove = (int)(1 / Time.deltaTime) + NextRandMove();
+        }
+
+        return Vector2.zero;
     }
 }

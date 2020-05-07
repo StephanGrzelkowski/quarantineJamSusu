@@ -22,17 +22,21 @@ public class FlockManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+
         flockCenter = GetFlockCenter();
         if (Input.GetMouseButton(0))
         {
+            
             Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
             target = mousePos;
-            targetDirection = (target - flockCenter).normalized;
+            targetDirection = target;
+            Debug.Log("Target Direction: " + targetDirection);
         }
         else
         {
             targetDirection = Vector2.zero;
         }
+        
     }
 
     Vector3 GetFlockCenter()
