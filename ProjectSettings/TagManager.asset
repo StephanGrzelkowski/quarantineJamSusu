@@ -3,7 +3,10 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - render
+  - pogo
+  - zuzu
   layers:
   - Default
   - TransparentFX
@@ -38,6 +41,12 @@ TagManager:
   - 
   - 
   m_SortingLayers:
+  - name: shadows
+    uniqueID: 2967942559
+    locked: 0
   - name: Default
     uniqueID: 0
+    locked: 0
+  - name: bodies
+    uniqueID: 3300531201
     locked: 0
